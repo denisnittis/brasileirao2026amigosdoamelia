@@ -6,7 +6,11 @@
 <meta name="theme-color" content="#F6F7F9">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Amigos do Amélia">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png" type="image/png">
 <title>Amigos do Amélia - Brasileirão 2026</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap');
@@ -1566,6 +1570,20 @@ document.getElementById("login-pin").addEventListener("input", e => { e.target.v
 document.getElementById("btn-logout").addEventListener("click", logout);
 document.querySelectorAll(".tab-btn").forEach(btn => btn.addEventListener("click", () => trocarAba(btn.dataset.tab)));
 tentarRetomarSessao();
+
+/* ---------- PWA: registra o service worker ----------
+   Sem isso o navegador não oferece a opção de "instalar" o app na tela
+   inicial. Roda depois do load pra não competir com o carregamento inicial
+   da página. Falha de forma silenciosa se o navegador não suportar (ex:
+   navegadores muito antigos) — o site continua funcionando normal, só
+   sem a opção de instalar. */
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(err => {
+      console.warn("Service worker não registrado:", err.message);
+    });
+  });
+}
 
 </script>
 </body>
