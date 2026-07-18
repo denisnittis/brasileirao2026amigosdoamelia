@@ -934,7 +934,7 @@ async function carregarJogos() {
       container.innerHTML = '<div class="empty-state">Erro ao carregar jogos: ' + (resultado.erro || "desconhecido") + '</div>';
       return;
     }
-    const ativos = resultado.jogos.filter(j => j.status !== "encerrado");
+    const ativos = resultado.jogos.filter(j => j.status !== "encerrado" && j.status !== "adiado");
 
     // Detecta gols: compara placar atual com o anterior
     ativos.forEach(jogo => {
