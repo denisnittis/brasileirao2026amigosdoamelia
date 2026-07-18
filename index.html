@@ -261,7 +261,13 @@
   .btn-compartilhar:active { color: var(--cor-destaque); border-color: var(--cor-destaque); }
 
   /* ---------- FILTROS DO HISTÓRICO ---------- */
-  .filtros-historico { display: flex; gap: 0.4rem; margin-bottom: 1.2rem; flex-wrap: wrap; }
+  .filtros-historico { display: flex; gap: 0.4rem; margin-bottom: 0.6rem; flex-wrap: wrap; }
+  .filtro-select {
+    width: auto; min-height: auto; margin-bottom: 1.2rem; padding: 0.5rem 2.2rem 0.5rem 0.85rem;
+    font-size: 0.8rem; font-weight: 500; border-radius: 999px; background-color: var(--cor-card);
+    background-position: right 0.85rem center; color: var(--cor-texto-2);
+  }
+  .filtro-select:focus { box-shadow: 0 0 0 4px var(--cor-destaque-soft); }
   .filtro-btn { background: var(--cor-card); border: 1px solid var(--cor-borda); color: var(--cor-texto-2); font-size: 0.78rem; font-weight: 500; padding: 0.5rem 0.85rem; border-radius: 999px; cursor: pointer; }
   .filtro-btn.active { background: var(--cor-destaque); border-color: var(--cor-destaque); color: var(--cor-destaque-texto); font-weight: 600; }
   .filtro-btn:active { transform: scale(0.97); }
@@ -479,6 +485,9 @@
         <button class="filtro-btn" data-filtro="vencedor" onclick="filtrarHistorico('vencedor', this)">✓ Vencedor</button>
         <button class="filtro-btn" data-filtro="errou" onclick="filtrarHistorico('errou', this)">✗ Errei</button>
       </div>
+      <select id="filtro-time-historico" class="filtro-select">
+        <option value="todos">Todos os times</option>
+      </select>
       <div id="lista-historico" class="loading">Carregando histórico...</div>
     </div>
 
@@ -1273,6 +1282,7 @@ async function carregarHistorico() {
       .filter(j => j.status === "encerrado")
       .sort((a, b) => new Date(b.dataHoraISO) - new Date(a.dataHoraISO)); // mais recentes primeiro
     jogosHistoricoCache = encerrados;
+    popularFiltroTimes();
     filtrarHistorico(filtroAtivo, document.querySelector(`.filtro-btn[data-filtro="${filtroAtivo}"]`));
   } catch (e) {
     container.innerHTML = '<div class="empty-state">Erro de conexão: ' + e.message + '</div>';
@@ -1443,6 +1453,44 @@ function compartilharRanking() {
 
 let jogosHistoricoCache = [];
 let filtroAtivo = "todos";
+let timeFiltroAtivo = "todos";
+
+/**
+ * Preenche o <select> de times com os nomes únicos que aparecem no
+ * histórico (casa + fora de todos os jogos encerrados), em ordem
+ * alfabética. Mantém a seleção atual se o time escolhido ainda existir
+ * na lista nova (evita resetar o filtro toda vez que recarrega).
+ */
+function popularFiltroTimes() {
+  const select = document.getElementById("filtro-time-historico");
+  const times = new Set();
+  jogosHistoricoCache.forEach(j => {
+    times.add(j.timeCasa);
+    times.add(j.timeFora);
+  });
+  const listaOrdenada = Array.from(times).sort((a, b) => a.localeCompare(b, "pt-BR"));
+
+  const selecaoAnterior = select.value;
+  select.innerHTML = '<option value="todos">Todos os times</option>';
+  listaOrdenada.forEach(nome => {
+    const opt = document.createElement("option");
+    opt.value = nome;
+    opt.textContent = nome;
+    select.appendChild(opt);
+  });
+
+  if (listaOrdenada.includes(selecaoAnterior)) {
+    select.value = selecaoAnterior;
+    timeFiltroAtivo = selecaoAnterior;
+  } else {
+    timeFiltroAtivo = "todos";
+  }
+}
+
+document.getElementById("filtro-time-historico").addEventListener("change", (e) => {
+  timeFiltroAtivo = e.target.value;
+  filtrarHistorico(filtroAtivo, document.querySelector(".filtro-btn.active"));
+});
 
 function filtrarHistorico(filtro, btnEl) {
   filtroAtivo = filtro;
@@ -1456,6 +1504,10 @@ function filtrarHistorico(filtro, btnEl) {
     jogos = jogos.filter(j => j.meuPalpite && j.meuPalpite.pontos === 3);
   } else if (filtro === "errou") {
     jogos = jogos.filter(j => j.meuPalpite && j.meuPalpite.pontos === 0);
+  }
+
+  if (timeFiltroAtivo !== "todos") {
+    jogos = jogos.filter(j => j.timeCasa === timeFiltroAtivo || j.timeFora === timeFiltroAtivo);
   }
 
   const container = document.getElementById("lista-historico");
