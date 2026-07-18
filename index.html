@@ -367,6 +367,34 @@
   .tabela-legenda span { display: flex; align-items: center; gap: 0.4rem; }
   .tabela-legenda-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 
+  /* ---------- BANNER DE INSTALAÇÃO DO APP ---------- */
+  .install-banner {
+    position: fixed; left: 0.75rem; right: 0.75rem; bottom: calc(0.75rem + env(safe-area-inset-bottom));
+    background: var(--cor-card); border: 1px solid var(--cor-borda); border-radius: var(--raio);
+    box-shadow: var(--sombra-elevada); padding: 0.9rem; z-index: 150;
+    display: flex; align-items: center; gap: 0.75rem;
+    transform: translateY(140%); transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1);
+    max-width: 480px; margin: 0 auto;
+  }
+  .install-banner.show { transform: translateY(0); }
+  .install-banner-icon { width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0; object-fit: cover; box-shadow: 0 2px 6px rgba(20,23,26,0.15); }
+  .install-banner-texto { flex: 1; min-width: 0; }
+  .install-banner-titulo { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 0.9rem; color: var(--cor-texto); text-transform: uppercase; letter-spacing: 0.01em; }
+  .install-banner-sub { font-size: 0.76rem; color: var(--cor-texto-2); margin-top: 0.1rem; line-height: 1.35; }
+  .install-banner-btn {
+    background: var(--cor-destaque); color: var(--cor-destaque-texto); border: none; border-radius: 999px;
+    padding: 0.55rem 1rem; font-family: 'Inter', sans-serif; font-weight: 600; font-size: 0.8rem;
+    cursor: pointer; flex-shrink: 0; white-space: nowrap;
+  }
+  .install-banner-btn:active { background: var(--cor-destaque-hover); }
+  .install-banner-fechar {
+    background: none; border: none; color: var(--cor-texto-3); font-size: 1.1rem; cursor: pointer;
+    padding: 0.3rem; flex-shrink: 0; line-height: 1;
+  }
+  @media (max-width: 380px) {
+    .install-banner-sub { display: none; }
+  }
+
 </style>
 </head>
 <body>
@@ -471,6 +499,16 @@
   </div>
 </div>
 <canvas class="confete-canvas" id="confete-canvas"></canvas>
+
+<div class="install-banner" id="install-banner">
+  <img src="icon-192.png" alt="" class="install-banner-icon">
+  <div class="install-banner-texto">
+    <div class="install-banner-titulo" id="install-banner-titulo">Instalar o app</div>
+    <div class="install-banner-sub" id="install-banner-sub">Acesso rápido direto da tela inicial</div>
+  </div>
+  <button class="install-banner-btn" id="btn-instalar" style="display:none;">Instalar</button>
+  <button class="install-banner-fechar" id="btn-fechar-instalar" aria-label="Fechar">✕</button>
+</div>
 
 <script>
 /* =========================================================
@@ -1583,6 +1621,85 @@ if ("serviceWorker" in navigator) {
       console.warn("Service worker não registrado:", err.message);
     });
   });
+}
+
+/* ---------- PWA: banner de instalação ----------
+   No Android/Chrome, o navegador dispara o evento "beforeinstallprompt"
+   quando decide que o site já pode ser instalado (não é garantido ser no
+   primeiro carregamento — cada navegador tem sua própria régua de
+   "engajamento" antes de liberar isso, é uma proteção contra spam de
+   instalação). A gente intercepta esse evento pra mostrar nosso próprio
+   banner em vez de depender do aviso discreto que o Chrome mostraria
+   sozinho.
+   No iPhone/Safari não existe esse evento — a Apple não permite disparar
+   o prompt de instalação via código. Nesse caso mostramos um banner só
+   com instrução (toque em Compartilhar → Adicionar à Tela de Início). */
+
+const CHAVE_DISPENSADO = "amigosDoAmelia_instalarDispensado";
+const DIAS_ATE_MOSTRAR_DE_NOVO = 7;
+
+function jaEstaInstalado() {
+  return window.matchMedia("(display-mode: standalone)").matches
+    || window.navigator.standalone === true; // iOS
+}
+
+function foiDispensadoRecentemente() {
+  const salvo = localStorage.getItem(CHAVE_DISPENSADO);
+  if (!salvo) return false;
+  const dias = (Date.now() - Number(salvo)) / (1000 * 60 * 60 * 24);
+  return dias < DIAS_ATE_MOSTRAR_DE_NOVO;
+}
+
+function marcarComoDispensado() {
+  localStorage.setItem(CHAVE_DISPENSADO, String(Date.now()));
+}
+
+let deferredInstallPrompt = null;
+
+function mostrarBannerInstalacao() {
+  if (jaEstaInstalado() || foiDispensadoRecentemente()) return;
+  document.getElementById("install-banner").classList.add("show");
+}
+
+function esconderBannerInstalacao() {
+  document.getElementById("install-banner").classList.remove("show");
+}
+
+// Android/Chrome/Edge: captura o prompt nativo pra disparar no nosso botão
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  document.getElementById("install-banner-titulo").textContent = "Instalar o app";
+  document.getElementById("install-banner-sub").textContent = "Acesso rápido direto da tela inicial";
+  document.getElementById("btn-instalar").style.display = "inline-block";
+  mostrarBannerInstalacao();
+});
+
+document.getElementById("btn-instalar").addEventListener("click", async () => {
+  esconderBannerInstalacao();
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+});
+
+document.getElementById("btn-fechar-instalar").addEventListener("click", () => {
+  esconderBannerInstalacao();
+  marcarComoDispensado();
+});
+
+window.addEventListener("appinstalled", () => {
+  esconderBannerInstalacao();
+  marcarComoDispensado();
+});
+
+// iOS/Safari: não existe beforeinstallprompt, então mostra instrução manual
+const ehIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+if (ehIOS && !jaEstaInstalado() && !foiDispensadoRecentemente()) {
+  document.getElementById("install-banner-titulo").textContent = "Instalar o app";
+  document.getElementById("install-banner-sub").textContent = "Toque em Compartilhar (□↑) e depois em \"Adicionar à Tela de Início\"";
+  // sem botão "Instalar" — no iOS não dá pra disparar isso via código
+  setTimeout(mostrarBannerInstalacao, 1200);
 }
 
 </script>
